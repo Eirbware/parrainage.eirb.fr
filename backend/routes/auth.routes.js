@@ -1,0 +1,67 @@
+import express from 'express'
+import dotenv from 'dotenv'
+import {login, verifyLogin, isLogged} from '../services/auth.service.js'
+
+const router = express.Router();
+
+router.get('/login', async (req, res) => {
+  try {
+    const { redirectUrl, code_verifier, state} = await login(`${process.env.FRONTEND_IP}/api/auth/callback`);
+    //Save in the session 
+    req.session.code_verifier = code_verifier;
+    req.session.state = state;
+    //redirect 
+    res.redirect(redirectUrl);
+    
+  } catch (error) {
+    console.log(error);
+    res.send("HTTP Error");
+  }
+
+});
+
+router.get('/auth/callback', async (req, res) => {
+  try {
+    //get currentURL 
+    //const currentURL = new URL(`${req.protocol}://${req.get('host')}${req.originalUrl}`);
+    const currentURL = new URL(`${process.env.FRONTEND_IP}/api/auth/callback`);
+    currentURL.search = new URLSearchParams(req.query).toString();
+
+    //Get the session var
+    const codeVerifier = req.session.code_verifier;
+    const expectedState = req.session.state;
+    //Verify Login with all
+    const user = await verifyLogin(currentURL, codeVerifier, expectedState);
+    delete req.session.code_verifier;
+    delete req.session.state;
+
+
+    const user_infos = {
+      login: user.login,
+      firstName: user.firstName,
+      lastName: user.lastName,
+    }
+    req.session.user = user_infos; //We save the user in SESSION
+    req.session.token_id = user.token_id; //and the token id for logout
+    res.redirect(process.env.FRONTEND_IP);
+  } catch (error) {
+    console.log(error);
+    res.send('HTTP Error');
+  }
+});
+
+//The route for the front to see if the user is connected
+router.get('/me', (req, res) => {
+  if (!req.session.user) return res.status(401).json({error : "Not connected"})
+    res.json(req.session.user)
+})
+
+
+//After the logout we need a redirect to the front
+router.get('/frontend', (req, res)=>{
+  res.redirect(process.env.FRONTEND_IP);
+})
+
+
+export default router;
+

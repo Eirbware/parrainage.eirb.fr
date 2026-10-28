@@ -1,0 +1,38 @@
+services:
+  nginx:
+      build:
+        context: ./nginx/ 
+        dockerfile: ./Dockerfile
+      container_name: nginx
+      restart: no
+      tty: true
+      ports:
+        - 80:80 #WEB PORT : 80
+        - 8080:80 #WEB PORT : 80
+      networks: 
+        - node-network
+      depends_on:
+        - backend
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ./Dockerfile
+    container_name: backend
+    working_dir: /app
+    volumes:
+      - ./backend/data.json/:/app/data.json
+      - ./backend/perms.json/:/app/perms.json
+    networks:
+      - node-network
+
+  redis:
+    image: redis:8.6.1-alpine
+    volumes:
+      - ./redis-data/:/data
+    networks:
+      - node-network
+
+networks:
+  node-network:
+    driver: bridge
